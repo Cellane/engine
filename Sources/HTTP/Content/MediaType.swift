@@ -1,25 +1,57 @@
+/// The MIT License (MIT)
+///
+/// Copyright (c) 2015 Zewo
+///
+/// Permission is hereby granted, free of charge, to any person obtaining a copy
+/// of this software and associated documentation files (the "Software"), to deal
+/// in the Software without restriction, including without limitation the rights
+/// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+/// copies of the Software, and to permit persons to whom the Software is
+/// furnished to do so, subject to the following conditions:
+///
+/// The above copyright notice and this permission notice shall be included in all
+/// copies or substantial portions of the Software.
+///
+/// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+/// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+/// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+/// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+/// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+/// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+/// SOFTWARE.
+
 import Foundation
 
-enum MediaTypeError : Error {
-    case malformedMediaTypeString
-}
-
+/// A media type (also MIME type and content type)
+/// is a two-part identifier for file formats and format
+/// contents transmitted on the Internet.
+///
+/// https://en.wikipedia.org/wiki/Media_type
+/// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
 public struct MediaType {
+
+    /// The type represents the category and can be a discrete or a multipart type.
     public let type: String
+
+    /// The subtype is specific to each type.
     public let subtype: String
+
+    /// Key/value pair parameters for this type.
     public let parameters: [String: String]
 
+    /// Create a new custom media type.
     public init(type: String, subtype: String, parameters: [String: String] = [:]) {
         self.type = type
         self.subtype = subtype
         self.parameters = parameters
     }
 
+    /// Parse a MediaType from a String.
     public init(string: String) throws {
         let mediaTypeTokens = string.components(separatedBy: ";")
 
         guard let mediaType = mediaTypeTokens.first else {
-            throw MediaTypeError.malformedMediaTypeString
+            throw ContentError(reason: "Malformed media type: \(string)")
         }
 
         var parameters: [String: String] = [:]
@@ -41,7 +73,7 @@ public struct MediaType {
         let tokens = mediaType.components(separatedBy: "/")
 
         guard tokens.count == 2 else {
-            throw MediaTypeError.malformedMediaTypeString
+            throw ContentError(reason: "Malformed media type: \(string)")
         }
 
         self.init(
@@ -51,6 +83,7 @@ public struct MediaType {
         )
     }
 
+    /// Parse appropriate media type from an accept header.
     public static func parse(acceptHeader: String) -> [MediaType] {
         var acceptedMediaTypes: [MediaType] = []
 
@@ -148,56 +181,58 @@ extension MediaType : Equatable {
 
 public extension MediaType {
     /// Any media type (*/*).
-    static let any = MediaType(type: "*", subtype: "*")
+    public static let any = MediaType(type: "*", subtype: "*")
     /// Plain text media type.
-    static let plainText = MediaType(type: "text", subtype: "plain", parameters: ["charset": "utf-8"])
+    public static let plainText = MediaType(type: "text", subtype: "plain", parameters: ["charset": "utf-8"])
     /// HTML media type.
-    static let html = MediaType(type: "text", subtype: "html", parameters: ["charset": "utf-8"])
+    public static let html = MediaType(type: "text", subtype: "html", parameters: ["charset": "utf-8"])
     /// CSS media type.
-    static let css = MediaType(type: "text", subtype: "css", parameters: ["charset": "utf-8"])
+    public static let css = MediaType(type: "text", subtype: "css", parameters: ["charset": "utf-8"])
     /// URL encoded form media type.
-    static let urlEncodedForm = MediaType(type: "application", subtype: "x-www-form-urlencoded", parameters: ["charset": "utf-8"])
+    public static let urlEncodedForm = MediaType(type: "application", subtype: "x-www-form-urlencoded", parameters: ["charset": "utf-8"])
     /// JSON media type.
-    static let json = MediaType(type: "application", subtype: "json", parameters: ["charset": "utf-8"])
+    public static let json = MediaType(type: "application", subtype: "json", parameters: ["charset": "utf-8"])
     /// XML media type.
-    static let xml = MediaType(type: "application", subtype: "xml", parameters: ["charset": "utf-8"])
+    public static let xml = MediaType(type: "application", subtype: "xml", parameters: ["charset": "utf-8"])
     /// DTD media type.
-    static let dtd = MediaType(type: "application", subtype: "xml-dtd", parameters: ["charset": "utf-8"])
+    public static let dtd = MediaType(type: "application", subtype: "xml-dtd", parameters: ["charset": "utf-8"])
     /// PDF data.
-    static let pdf = MediaType(type: "application", subtype: "pdf")
+    public static let pdf = MediaType(type: "application", subtype: "pdf")
     /// Zip file.
-    static let zip = MediaType(type: "application", subtype: "zip")
+    public static let zip = MediaType(type: "application", subtype: "zip")
     /// tar file.
-    static let tar = MediaType(type: "application", subtype: "x-tar")
+    public static let tar = MediaType(type: "application", subtype: "x-tar")
     /// Gzip file.
-    static let gzip = MediaType(type: "application", subtype: "x-gzip")
+    public static let gzip = MediaType(type: "application", subtype: "x-gzip")
     /// Bzip2 file.
-    static let bzip2 = MediaType(type: "application", subtype: "x-bzip2")
+    public static let bzip2 = MediaType(type: "application", subtype: "x-bzip2")
     /// Binary data.
-    static let binary = MediaType(type: "application", subtype: "octet-stream")
+    public static let binary = MediaType(type: "application", subtype: "octet-stream")
     /// GIF image.
-    static let gif = MediaType(type: "image", subtype: "gif")
+    public static let gif = MediaType(type: "image", subtype: "gif")
     /// JPEG image.
-    static let jpeg = MediaType(type: "image", subtype: "jpeg")
+    public static let jpeg = MediaType(type: "image", subtype: "jpeg")
     /// PNG image.
-    static let png = MediaType(type: "image", subtype: "png")
+    public static let png = MediaType(type: "image", subtype: "png")
     /// SVG image.
-    static let svg = MediaType(type: "image", subtype: "svg+xml")
+    public static let svg = MediaType(type: "image", subtype: "svg+xml")
     /// Basic audio.
-    static let audio = MediaType(type: "audio", subtype: "basic")
+    public static let audio = MediaType(type: "audio", subtype: "basic")
     /// MIDI audio.
-    static let midi = MediaType(type: "audio", subtype: "x-midi")
+    public static let midi = MediaType(type: "audio", subtype: "x-midi")
     /// MP3 audio.
-    static let mp3 = MediaType(type: "audio", subtype: "mpeg")
+    public static let mp3 = MediaType(type: "audio", subtype: "mpeg")
     /// Wave audio.
-    static let wave = MediaType(type: "audio", subtype: "wav")
+    public static let wave = MediaType(type: "audio", subtype: "wav")
     /// OGG audio.
-    static let ogg = MediaType(type: "audio", subtype: "vorbis")
+    public static let ogg = MediaType(type: "audio", subtype: "vorbis")
     /// AVI video.
-    static let avi = MediaType(type: "video", subtype: "avi")
+    public static let avi = MediaType(type: "video", subtype: "avi")
     /// MPEG video.
-    static let mpeg = MediaType(type: "video", subtype: "mpeg")
+    public static let mpeg = MediaType(type: "video", subtype: "mpeg")
 }
+
+// MARK: Extensions
 
 let fileExtensionMediaTypeMapping: [String: String] = [
     "ez": "application/andrew-inset",
