@@ -36,9 +36,9 @@ public final class Client: Core.Stream {
     var onClose: SocketEvent?
 
     /// Creates a new Remote Client from the ServerSocket's details
-    public init(socket: Socket, queue: DispatchQueue) {
+    public init(socket: Socket) {
         self.socket = socket
-        self.queue = queue
+        self.queue = .global()
 
         // Allocate one TCP packet
         let size = 65_507

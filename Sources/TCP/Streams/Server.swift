@@ -17,21 +17,12 @@ public final class Server: Core.OutputStream {
     // MARK: Internal
 
     let socket: Socket
-    let workers: [DispatchQueue]
-    var worker: LoopIterator<[DispatchQueue]>
     var readSource: DispatchSourceRead?
 
     /// Creates a TCP server from an existing TCP socket.
     public init(socket: Socket, workerCount: Int) {
         self.socket = socket
-        self.queue = DispatchQueue(label: "codes.vapor.net.tcp.server.main", qos: .userInteractive)
-        var workers: [DispatchQueue] = []
-        for i in 1...workerCount {
-            let worker = DispatchQueue(label: "codes.vapor.net.tcp.server.worker.\(i)", qos: .userInteractive)
-            workers.append(worker)
-        }
-        worker = LoopIterator(collection: workers)
-        self.workers = workers
+        self.queue = .global()
     }
 
     /// Creates a new Server Socket
@@ -56,8 +47,8 @@ public final class Server: Core.OutputStream {
                 return
             }
 
-            let queue = self.worker.next()!
-            let client = Client(socket: socket, queue: queue)
+            // let queue = self.worker.next()!
+            let client = Client(socket: socket)
             client.errorStream = self.errorStream
             self.outputStream?(client)
         }
