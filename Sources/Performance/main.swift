@@ -90,10 +90,11 @@ do {
 
     server.drain { client in
         let parser = HTTP.RequestParser()
+        let responder = app.makeStream()
         let serializer = HTTP.ResponseSerializer()
 
         client.stream(to: parser)
-            .stream(to: app.makeStream(on: client.queue))
+            .stream(to: responder)
             .stream(to: serializer)
             .drain(into: client)
 
