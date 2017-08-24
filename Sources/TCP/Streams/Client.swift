@@ -11,11 +11,6 @@ public final class Client: Core.Stream {
     public var errorStream: ErrorHandler?
     public var outputStream: OutputHandler?
 
-    /// This client's dispatch queue. Use this
-    /// for all async operations performed as a
-    /// result of this client.
-    public let queue: DispatchQueue
-
     /// The client stream's underlying socket.
     public let socket: Socket
 
@@ -27,18 +22,14 @@ public final class Client: Core.Stream {
     var inputBuffer: DispatchData?
 
     // Stores read event source.
-    var readSource: DispatchSourceRead?
+    var readSource: SocketSource?
 
     // Stores write event source.
-    var writeSource: DispatchSourceWrite?
-
-    // This closure is called when the client closes.
-    var onClose: SocketEvent?
+    var writeSource: SocketSource?
 
     /// Creates a new Remote Client from the ServerSocket's details
-    public init(socket: Socket, queue: DispatchQueue) {
+    public init(socket: Socket) {
         self.socket = socket
-        self.queue = queue
 
         // Allocate one TCP packet
         let size = 65_507
@@ -47,6 +38,8 @@ public final class Client: Core.Stream {
     }
 
     // MARK: Stream
+
+    public var onClose: (() -> ())?
 
     /// Handles stream input
     public func inputStream(_ input: DispatchData) {
@@ -58,7 +51,9 @@ public final class Client: Core.Stream {
         }
 
         if writeSource == nil {
-            writeSource = socket.onWriteable(queue: queue) {
+            let source = socket.makeSource(.write, timeout: .seconds(30))
+
+            source.onEvent {
                 // important: make sure to suspend or else writeable
                 // will keep calling.
                 self.writeSource?.suspend()
@@ -81,13 +76,25 @@ public final class Client: Core.Stream {
                     self.errorStream?(error)
                 }
             }
+
+            source.onTimeout {
+                self.close()
+            }
+
+            writeSource = source
         }
 
     }
 
     /// Starts receiving data from the client
     public func start() {
-        readSource = socket.onReadable(queue: queue) {
+        let source = socket.makeSource(.read, timeout: .seconds(30))
+
+        source.onTimeout {
+            self.close()
+        }
+
+        source.onEvent {
             let read: Int
             do {
                 read = try self.socket.read(
@@ -109,24 +116,29 @@ public final class Client: Core.Stream {
             )
             self.outputStream?(bufferView)
         }
+
+        readSource = source
     }
 
     /// Closes the client.
     public func close() {
+        // print("\(socket.descriptor.raw) socket.close()")
+        socket.close()
+        // important! client will not be deallocated if this 
+        outputStream = nil
         readSource?.cancel()
         writeSource?.cancel()
-        socket.close()
+        readSource = nil
+        writeSource = nil
         onClose?()
     }
 
     /// Deallocated the pointer buffer
     deinit {
+        // print("deinit")
         close()
-        guard let pointer = outputBuffer.baseAddress else {
-            return
-        }
-        pointer.deinitialize(count: outputBuffer.count)
-        pointer.deallocate(capacity: outputBuffer.count)
+        outputBuffer.baseAddress.unsafelyUnwrapped.deinitialize(count: outputBuffer.count)
+        outputBuffer.baseAddress.unsafelyUnwrapped.deallocate(capacity: outputBuffer.count)
     }
 }
 

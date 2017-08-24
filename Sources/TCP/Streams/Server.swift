@@ -9,29 +9,14 @@ public final class Server: Core.OutputStream {
     public var errorStream: ErrorHandler?
     public var outputStream: OutputHandler?
 
-    // MARK: Dispatch
-
-    /// The dispatch queue that peers are accepted on.
-    public let queue: DispatchQueue
-
     // MARK: Internal
 
     let socket: Socket
-    let workers: [DispatchQueue]
-    var worker: LoopIterator<[DispatchQueue]>
-    var readSource: DispatchSourceRead?
+    var readSource: SocketSource?
 
     /// Creates a TCP server from an existing TCP socket.
     public init(socket: Socket, workerCount: Int) {
         self.socket = socket
-        self.queue = DispatchQueue(label: "codes.vapor.net.tcp.server.main", qos: .userInteractive)
-        var workers: [DispatchQueue] = []
-        for i in 1...workerCount {
-            let worker = DispatchQueue(label: "codes.vapor.net.tcp.server.worker.\(i)", qos: .userInteractive)
-            workers.append(worker)
-        }
-        worker = LoopIterator(collection: workers)
-        self.workers = workers
     }
 
     /// Creates a new Server Socket
@@ -47,7 +32,8 @@ public final class Server: Core.OutputStream {
         try socket.bind(hostname: hostname, port: port)
         try socket.listen(backlog: backlog)
 
-        readSource = socket.onReadable(queue: queue) {
+        let source = socket.makeSource(.read, timeout: .never)
+        source.onEvent {
             let socket: Socket
             do {
                 socket = try self.socket.accept()
@@ -56,10 +42,15 @@ public final class Server: Core.OutputStream {
                 return
             }
 
-            let queue = self.worker.next()!
-            let client = Client(socket: socket, queue: queue)
+            let client = Client(socket: socket)
             client.errorStream = self.errorStream
             self.outputStream?(client)
         }
+
+        source.onTimeout {
+            fatalError("Server should not timeout.")
+        }
+
+        readSource = source
     }
 }
