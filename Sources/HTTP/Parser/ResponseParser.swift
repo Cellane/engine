@@ -5,7 +5,7 @@ import Foundation
 /// Parses requests from a readable stream.
 public final class ResponseParser: CParser {
     // MARK: Stream
-    public typealias Input = ByteBuffer
+    public typealias Input = DispatchData
     public typealias Output = Response
     public var outputStream: OutputHandler?
     public var errorStream: ErrorHandler?
@@ -32,9 +32,10 @@ public final class ResponseParser: CParser {
     }
     
     /// Handles incoming stream data
-    public func inputStream(_ input: ByteBuffer) {
+    public func inputStream(_ input: DispatchData) {
         do {
-            guard let request = try parse(from: input) else {
+            let data = Data(input)
+            guard let request = try parse(from: data) else {
                 return
             }
             outputStream?(request)

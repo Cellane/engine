@@ -24,7 +24,7 @@ public final class Server: Core.OutputStream {
     /// Creates a TCP server from an existing TCP socket.
     public init(socket: Socket, workerCount: Int) {
         self.socket = socket
-        self.queue = DispatchQueue(label: "codes.vapor.net.tcp.server.main", qos: .userInteractive)
+        self.queue = DispatchQueue(label: "codes.vapor.net.tcp.server.main", qos: .background)
         var workers: [DispatchQueue] = []
         for i in 1...workerCount {
             let worker = DispatchQueue(label: "codes.vapor.net.tcp.server.worker.\(i)", qos: .userInteractive)

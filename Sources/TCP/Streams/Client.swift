@@ -7,7 +7,7 @@ import libc
 public final class Client: Core.Stream {
     // MARK: Stream
     public typealias Input = DispatchData
-    public typealias Output = ByteBuffer
+    public typealias Output = DispatchData
     public var errorStream: ErrorHandler?
     public var outputStream: OutputHandler?
 
@@ -19,114 +19,94 @@ public final class Client: Core.Stream {
     /// The client stream's underlying socket.
     public let socket: Socket
 
-    // Bytes from the socket are read into this buffer.
-    // Views into this buffer supplied to output streams.
-    let outputBuffer: MutableByteBuffer
-
-    // Data being fed into the client stream is stored here.
-    var inputBuffer: DispatchData?
-
-    // Stores read event source.
-    var readSource: DispatchSourceRead?
-
-    // Stores write event source.
-    var writeSource: DispatchSourceWrite?
-
-    // This closure is called when the client closes.
-    var onClose: SocketEvent?
+    /// The client's dispatch IO channel
+    private let io: DispatchIO
 
     /// Creates a new Remote Client from the ServerSocket's details
     public init(socket: Socket, queue: DispatchQueue) {
         self.socket = socket
         self.queue = queue
 
-        // Allocate one TCP packet
-        let size = 65_507
-        let pointer = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
-        self.outputBuffer = MutableByteBuffer(start: pointer, count: size)
+        io = DispatchIO(
+            type: .stream,
+            fileDescriptor: socket.descriptor.raw,
+            queue: queue
+        ) { error in
+            if error == 0 {
+
+            } else {
+                // fatalError("error during cleanup: \(error)")
+            }
+        }
+
+        io.setLimit(lowWater: 1)
+        // io.setLimit(highWater: 64)
     }
 
     // MARK: Stream
 
     /// Handles stream input
     public func inputStream(_ input: DispatchData) {
-        if inputBuffer == nil {
-            inputBuffer = input
-            writeSource?.resume()
-        } else {
-            inputBuffer?.append(input)
-        }
-
-        if writeSource == nil {
-            writeSource = socket.onWriteable(queue: queue) {
-                // important: make sure to suspend or else writeable
-                // will keep calling.
-                self.writeSource?.suspend()
-
-                // grab input buffer
-                guard let data = self.inputBuffer else {
-                    return
-                }
-                self.inputBuffer = nil
-
-                // copy input into contiguous data and write it.
-                let copied = Data(data)
-                let buffer = ByteBuffer(start: copied.withUnsafeBytes { $0 }, count: copied.count)
-                do {
-                    _ = try self.socket.write(max: copied.count, from: buffer)
-                    // FIXME: we should verify the lengths match here.
-                } catch {
-                    // any errors that occur here cannot be thrown,
-                    // so send them to stream error catcher.
-                    self.errorStream?(error)
+        io.write(offset: 0, data: input, queue: queue) { done, data, error in
+            if error != 0 {
+                self.errorStream?("write error: \(error)")
+                self.close()
+            } else if done {
+                // great
+            } else {
+                if let data = data {
+                    // re write remaining
+                    print("re write")
+                    self.inputStream(data)
+                } else {
+                    self.errorStream?("no remaining data on unfinished write")
                 }
             }
         }
-
     }
 
     /// Starts receiving data from the client
     public func start() {
-        readSource = socket.onReadable(queue: queue) {
-            let read: Int
-            do {
-                read = try self.socket.read(
-                    max: self.outputBuffer.count,
-                    into: self.outputBuffer
-                )
-            } catch {
-                // any errors that occur here cannot be thrown,
-                // so send them to stream error catcher.
-                self.errorStream?(error)
-                return
+        io.read(offset: 0, length: .untilEOF, queue: queue) { done, data, error in
+            if error != 0 {
+                self.errorStream?("read error: \(error)")
+                self.close()
+            } else {
+                if done {
+                    // what to do here?
+                }
+                if let data = data {
+                    if data.count > 0 {
+                        self.outputStream?(data)
+                    } else {
+                        self.close()
+                    }
+                } else {
+                    self.errorStream?("no data on read?")
+                }
             }
-
-            // create a view into our internal buffer and
-            // send to the output stream
-            let bufferView = ByteBuffer(
-                start: self.outputBuffer.baseAddress,
-                count: read
-            )
-            self.outputStream?(bufferView)
         }
     }
 
     /// Closes the client.
     public func close() {
-        readSource?.cancel()
-        writeSource?.cancel()
+        print("close")
         socket.close()
-        onClose?()
+        // important! it's common for a client to drain into itself
+        // we need to make sure to break that reference cycle
+        outputStream = nil
     }
 
     /// Deallocated the pointer buffer
     deinit {
+        print("deinit")
         close()
-        guard let pointer = outputBuffer.baseAddress else {
-            return
-        }
-        pointer.deinitialize(count: outputBuffer.count)
-        pointer.deallocate(capacity: outputBuffer.count)
     }
 }
 
+
+extension Int {
+    static let untilEOF = size_t.max - 1
+}
+
+extension String: Swift.Error { }

@@ -4,7 +4,7 @@ import Foundation
 import HTTP
 import TCP
 
-extension String: Swift.Error { }
+// extension String: Swift.Error { }
 
 struct User: Codable {
     var name: String
@@ -42,46 +42,46 @@ struct Application: Responder {
 
 
 // MARK: Client
-do {
-    final class RequestEmitter: Core.OutputStream {
-        typealias Output = Request
-        var outputStream: OutputHandler?
-        var errorStream: ErrorHandler?
-
-        init() {}
-
-        func emit(_ request: Request) {
-            outputStream?(request)
-        }
-    }
-
-    let emitter = RequestEmitter()
-    let serializer = RequestSerializer()
-    let parser = ResponseParser()
-
-    let socket = try TCP.Socket()
-    try socket.connect(hostname: "google.com", port: 80)
-    let client = TCP.Client(socket: socket, queue: .global())
-
-    emitter.stream(to: serializer)
-        .stream(to: client)
-        .stream(to: parser)
-        .drain { response in
-            print(String(data: response.body.data, encoding: .utf8)!)
-        }
-
-    emitter.errorStream = { error in
-        print(error)
-    }
-    client.start()
-
-
-    let request = try Request(method: .get, uri: URI(path: "/"), body: "hello")
-    request.headers[.host] = "google.com"
-    request.headers[.userAgent] = "vapor/engine"
-
-    emitter.emit(request)
-}
+//do {
+//    final class RequestEmitter: Core.OutputStream {
+//        typealias Output = Request
+//        var outputStream: OutputHandler?
+//        var errorStream: ErrorHandler?
+//
+//        init() {}
+//
+//        func emit(_ request: Request) {
+//            outputStream?(request)
+//        }
+//    }
+//
+//    let emitter = RequestEmitter()
+//    let serializer = RequestSerializer()
+//    let parser = ResponseParser()
+//
+//    let socket = try TCP.Socket()
+//    try socket.connect(hostname: "google.com", port: 80)
+//    let client = TCP.Client(socket: socket, queue: .global())
+//
+//    emitter.stream(to: serializer)
+//        .stream(to: client)
+//        .stream(to: parser)
+//        .drain { response in
+//            print(String(data: response.body.data, encoding: .utf8)!)
+//        }
+//
+//    emitter.errorStream = { error in
+//        print(error)
+//    }
+//    client.start()
+//
+//
+//    let request = try Request(method: .get, uri: URI(path: "/"), body: "hello")
+//    request.headers[.host] = "google.com"
+//    request.headers[.userAgent] = "vapor/engine"
+//
+//    emitter.emit(request)
+//}
 
 // MARK: Server
 do {
