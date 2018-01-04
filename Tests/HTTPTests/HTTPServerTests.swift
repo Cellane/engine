@@ -6,7 +6,11 @@ import TCP
 import XCTest
 
 struct EchoWorker: HTTPResponder, Worker {
-    let eventLoop: EventLoop = DispatchEventLoop(label: "codes.vapor.http.test.server.worker")
+    let eventLoop: EventLoop
+
+    init(on worker: Worker) {
+        self.eventLoop = worker.eventLoop
+    }
 
     func respond(to req: HTTPRequest, on Worker: Worker) throws -> Future<HTTPResponse> {
         /// simple echo server
@@ -16,34 +20,19 @@ struct EchoWorker: HTTPResponder, Worker {
 
 class HTTPServerTests: XCTestCase {
     func testTCP() throws {
-        let accept = DispatchEventLoop(label: "codes.vapor.http.test.server.accept")
-        let workers = [
-            EchoWorker(),
-            EchoWorker(),
-            EchoWorker(),
-            EchoWorker(),
-            EchoWorker(),
-            EchoWorker(),
-            EchoWorker(),
-            EchoWorker()
-        ]
+        let worker = try DefaultEventLoop(label: "codes.vapor.http.test.server")
 
         let tcpSocket = try TCPSocket(isNonBlocking: true)
         let tcpServer = try TCPServer(socket: tcpSocket)
         let server = HTTPServer<TCPClientStream, EchoWorker>(
-            acceptStream: tcpServer.stream(on: accept),
-            workers: workers
+            acceptStream: tcpServer.stream(on: worker),
+            workers: [EchoWorker(on: worker)]
         )
         server.onError = { XCTFail("\($0)") }
 
         if #available(OSX 10.12, *) {
             Thread.detachNewThread {
-                accept.run()
-            }
-            for worker in workers {
-                Thread.detachNewThread {
-                    worker.eventLoop.run()
-                }
+                worker.runLoop()
             }
         } else {
             fatalError()
@@ -52,6 +41,7 @@ class HTTPServerTests: XCTestCase {
         // beyblades let 'er rip
         try tcpServer.start(hostname: "localhost", port: 8123, backlog: 128)
         let exp = expectation(description: "all requests complete")
+
         var num = 1024
         for _ in 0..<num {
             let clientSocket = try TCPSocket(isNonBlocking: false)

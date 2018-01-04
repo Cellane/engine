@@ -15,10 +15,16 @@ class SocketsTests: XCTestCase {
         let serverSocket = try TCPSocket(isNonBlocking: true)
         let server = try TCPServer(socket: serverSocket)
 
-        let worker = DispatchEventLoop(label: "codes.vapor.test.worker.1")
-        let serverStream = server.stream(
-            on: DispatchEventLoop(label: "codes.vapor.test.server")
-        )
+        let worker = try DefaultEventLoop(label: "codes.vapor.test.worker.1")
+        let serverStream = server.stream(on: worker)
+
+        if #available(OSX 10.12, *) {
+            Thread.detachNewThread {
+                worker.runLoop()
+            }
+        } else {
+            fatalError()
+        }
 
         /// set up the server stream
         serverStream.drain { req in

@@ -23,7 +23,7 @@ class SSLTests: XCTestCase {
             let tlsClient = try AppleTLSClient(tcp: tcpClient, using: tlsSettings)
         #endif
         try tlsClient.connect(hostname: "google.com", port: 443)
-        // try tlsClient.socket.handshake()
+        try tlsClient.socket.prepareSocket()
         let req = "GET /robots.txt HTTP/1.1\r\nContent-Length: 0\r\nHost: www.google.com\r\nUser-Agent: hi\r\n\r\n".data(using: .utf8)!
         _ = try tlsClient.socket.write(from: req.withByteBuffer { $0 })
         var res = Data(count: 4096)
@@ -45,8 +45,18 @@ class SSLTests: XCTestCase {
 
         let exp = expectation(description: "read data")
 
-        let tlsStream = tlsClient.socket.source(on: DispatchEventLoop(label: "codes.vapor.tls.client"))
-        let tlsSink = tlsClient.socket.sink(on: DispatchEventLoop(label: "codes.vapor.tls.client"))
+        let worker = try DefaultEventLoop(label: "codes.vapor.tls.client")
+
+        if #available(OSX 10.12, *) {
+            Thread.detachNewThread {
+                worker.runLoop()
+            }
+        } else {
+            fatalError()
+        }
+
+        let tlsStream = tlsClient.socket.source(on: worker)
+        let tlsSink = tlsClient.socket.sink(on: worker)
         
         tlsStream.drain { req in
             req.request(count: 1)
